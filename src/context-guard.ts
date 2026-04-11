@@ -317,12 +317,15 @@ export function createContextGuard(
     if (status !== null) {
       gitCache = { status, timestamp: now };
 
-      // Detect new commits — compare lastCommit string to previous cache value.
+      // Detect new commits — compare commit messages (stripped of relative time)
+      // to avoid false positives from "%cr" changing every cache refresh.
       // Skip the first cache fill (previousLastCommit === "") to avoid false positives.
+      const prevMessage = extractCommitMessage(previousLastCommit);
+      const currMessage = extractCommitMessage(status.lastCommit);
       if (
-        previousLastCommit !== "" &&
-        status.lastCommit !== "" &&
-        status.lastCommit !== previousLastCommit
+        prevMessage !== "" &&
+        currMessage !== "" &&
+        currMessage !== prevMessage
       ) {
         const message = extractCommitMessage(status.lastCommit);
         appendToSection(
