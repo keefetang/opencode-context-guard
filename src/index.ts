@@ -1,5 +1,6 @@
 import type { Plugin } from "@opencode-ai/plugin";
 
+import { createContextGuard } from "./context-guard.js";
 import { readState, resolveConfig } from "./state-reader.js";
 import type { PluginConfig } from "./state-reader.js";
 
@@ -17,10 +18,12 @@ export const ContextGuardPlugin: Plugin = async (ctx, options) => {
   // Initial STATE.md read — warms the cache
   readState(repoRoot, config);
 
+  const guard = createContextGuard(ctx, repoRoot, config);
+
   return {
-    // Hooks, tools, and events will be added in later units:
-    // - Unit 2: system prompt injection (experimental.chat.system.transform)
-    // - Unit 3: git integration
+    ...guard.hooks,
+    event: guard.event,
+    // Tools and additional hooks will be added in later units:
     // - Unit 4: session tracking + obligations (tool.execute.after, event)
     // - Unit 5: custom tools (context_checkpoint, context_load, context_discover)
     // - Unit 6: session lifecycle (experimental.session.compacting, event)
