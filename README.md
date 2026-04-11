@@ -132,7 +132,7 @@ Restart OpenCode. No configuration needed — works immediately with sensible de
 
 ## Performance
 
-The plugin adds <1ms to typical turns (one `fs.stat` call to check if STATE.md changed). Git status refreshes every 30 seconds (~70ms, invisible alongside 2-5 second API calls). System prompt injection is ~200 tokens — 0.02% of a 1M context window.
+The plugin adds <1ms to typical turns (one `fs.stat` call to check if STATE.md changed). Git status refreshes every 30 seconds (~70ms, invisible alongside 2-5 second API calls). System prompt injection is ~200 tokens — negligible overhead.
 
 ## License
 

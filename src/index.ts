@@ -18,15 +18,15 @@ export const ContextGuardPlugin: Plugin = async (ctx, options) => {
   // Initial STATE.md read — warms the cache
   readState(repoRoot, config);
 
+  // Diagnostic: log on init so --print-logs confirms plugin is loading
+  void ctx.client.app.log({ body: { service: "context-guard", level: "info", message: `context-guard loaded (repoRoot: ${repoRoot})` } });
+
   const guard = createContextGuard(ctx, repoRoot, config);
 
   return {
     ...guard.hooks,
     event: guard.event,
-    // Tools and additional hooks will be added in later units:
-    // - Unit 4: session tracking + obligations (tool.execute.after, event)
-    // - Unit 5: custom tools (context_checkpoint, context_load, context_discover)
-    // - Unit 6: session lifecycle (experimental.session.compacting, event)
+    tool: guard.tools,
   };
 };
 
