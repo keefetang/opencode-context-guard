@@ -14,8 +14,8 @@ Entry point: `src/index.ts` exports `ContextGuardPlugin`, a plugin function regi
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `src/index.ts` | 30 | Plugin entry point — resolves config, warms STATE.md cache, wires hooks/tools/events |
-| `src/context-guard.ts` | 826 | Hooks, tools, git integration, session tracking, obligation detection, system prompt builder |
+| `src/index.ts` | 33 | Plugin entry point — resolves config, warms STATE.md cache, wires hooks/tools/events |
+| `src/context-guard.ts` | 842 | Hooks, tools, git integration, session tracking, obligation detection, system prompt builder |
 | `src/state-reader.ts` | 303 | STATE.md parse/cache/read/write, artifact scanning, config types and defaults |
 
 ## Plugin Hooks
