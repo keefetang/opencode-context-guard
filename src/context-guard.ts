@@ -32,7 +32,8 @@ interface GitStatus {
   branch: string;
   uncommitted: number;
   ahead: number;
-  lastCommit: string; // "message (relative time)"
+  lastCommitHash: string; // short hash for change detection
+  lastCommit: string; // "message (relative time)" for display
 }
 
 interface GitCache {
@@ -46,7 +47,6 @@ interface SessionState {
   lastActivityTime: number;
   toolCallCount: number;
   filesModified: boolean;
-  isSubagent: boolean | null; // null = not yet checked
   isFirstTurn: boolean;
   stateAtSessionStart: number | null; // STATE.md mtime at session creation, null if no STATE.md
   lastSeenStateMtime: number | null; // mtime of STATE.md as of last turn
@@ -196,9 +196,16 @@ function fetchGitStatus(repoRoot: string): GitStatus | null {
     // Uncommitted count: non-empty lines after the first
     const uncommitted = lines.slice(1).filter((l) => l.trim() !== "").length;
 
-    // Last commit message
+    // Last commit — hash for change detection, message+time for display
+    let lastCommitHash = "";
     let lastCommit = "";
     try {
+      lastCommitHash = execSync("git log -1 --format=%h", {
+        cwd: repoRoot,
+        encoding: "utf-8",
+        timeout: 5_000,
+        stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
       lastCommit = execSync('git log -1 --format="%s (%cr)"', {
         cwd: repoRoot,
         encoding: "utf-8",
@@ -209,7 +216,7 @@ function fetchGitStatus(repoRoot: string): GitStatus | null {
       // No commits yet or other error — leave empty
     }
 
-    return { branch, uncommitted, ahead, lastCommit };
+    return { branch, uncommitted, ahead, lastCommitHash, lastCommit };
   } catch {
     // Not a git repo, git not installed, etc.
     return null;
@@ -285,7 +292,6 @@ export function createContextGuard(
       lastActivityTime: now,
       toolCallCount: 0,
       filesModified: false,
-      isSubagent: null,
       isFirstTurn: true,
       stateAtSessionStart: getStateMtime(),
       lastSeenStateMtime: null, // initialized after first buildSystemPrompt
@@ -312,20 +318,18 @@ export function createContextGuard(
       return gitCache.status;
     }
 
-    const previousLastCommit = gitCache?.status.lastCommit ?? "";
+    const previousHash = gitCache?.status.lastCommitHash ?? "";
     const status = fetchGitStatus(repoRoot);
     if (status !== null) {
       gitCache = { status, timestamp: now };
 
-      // Detect new commits — compare commit messages (stripped of relative time)
-      // to avoid false positives from "%cr" changing every cache refresh.
-      // Skip the first cache fill (previousLastCommit === "") to avoid false positives.
-      const prevMessage = extractCommitMessage(previousLastCommit);
-      const currMessage = extractCommitMessage(status.lastCommit);
+      // Detect new commits — compare short hashes for reliable change detection.
+      // Hashes are stable (unlike commit messages which could be identical across commits).
+      // Skip the first cache fill (previousHash === "") to avoid false positives.
       if (
-        prevMessage !== "" &&
-        currMessage !== "" &&
-        currMessage !== prevMessage
+        previousHash !== "" &&
+        status.lastCommitHash !== "" &&
+        status.lastCommitHash !== previousHash
       ) {
         const message = extractCommitMessage(status.lastCommit);
         appendToSection(
