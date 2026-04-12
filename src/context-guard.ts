@@ -602,6 +602,9 @@ export function createContextGuard(
           "log",
           `[auto] ${formatTimestamp()} Session compacted. ${session.toolCallCount} tool calls. No explicit checkpoint.`,
         );
+        // Update lastSeenStateMtime so the next turn doesn't fire a false
+        // "updated externally" warning for the write the plugin just made.
+        session.lastSeenStateMtime = getStateMtime();
       }
     }
 
@@ -679,6 +682,7 @@ export function createContextGuard(
         const newMtime = getStateMtime();
         session.stateAtSessionStart = newMtime;
         session.lastSeenStateMtime = newMtime;
+        session.filesModified = false;
       }
 
       return `STATE.md updated. Focus: ${args.focus}`;
@@ -766,7 +770,11 @@ export function createContextGuard(
         );
         // Suppress false external-change warning on next turn (same as context_checkpoint)
         const session = sessions.get(context.sessionID);
-        if (session !== undefined) session.lastSeenStateMtime = getStateMtime();
+        if (session !== undefined) {
+          const newMtime = getStateMtime();
+          session.lastSeenStateMtime = newMtime;
+          session.stateAtSessionStart = newMtime;
+        }
         return `Saved to STATE.md Log: ${args.content}`;
       }
 
@@ -779,7 +787,11 @@ export function createContextGuard(
         );
         // Suppress false external-change warning on next turn (same as context_checkpoint)
         const session = sessions.get(context.sessionID);
-        if (session !== undefined) session.lastSeenStateMtime = getStateMtime();
+        if (session !== undefined) {
+          const newMtime = getStateMtime();
+          session.lastSeenStateMtime = newMtime;
+          session.stateAtSessionStart = newMtime;
+        }
         return `Saved to STATE.md Decisions: ${args.content}`;
       }
 
