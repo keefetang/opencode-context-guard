@@ -548,3 +548,136 @@ describe("appendToSection", () => {
     expect(content).toContain("- Decision A [2026-04-11]");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Log rotation (maxLogEntries)
+// ---------------------------------------------------------------------------
+
+describe("appendToSection — log rotation", () => {
+  beforeEach(() => {
+    invalidateStateCache();
+  });
+
+  test("trims old log entries when exceeding maxLogEntries", () => {
+    const dir = makeTmpDir();
+    const config = resolveConfig({ maxLogEntries: 3 });
+
+    writeCurrentSection(dir, config, { focus: "Log rotation test" });
+    invalidateStateCache();
+
+    // Add 5 entries with a max of 3
+    for (let i = 1; i <= 5; i++) {
+      appendToSection(dir, config, "log", `- Entry ${i}`);
+      invalidateStateCache();
+    }
+
+    const content = readStateFile(dir);
+    // Oldest two (Entry 1, Entry 2) should be trimmed
+    expect(content).not.toContain("- Entry 1");
+    expect(content).not.toContain("- Entry 2");
+    // Most recent three should remain
+    expect(content).toContain("- Entry 3");
+    expect(content).toContain("- Entry 4");
+    expect(content).toContain("- Entry 5");
+  });
+
+  test("preserves most recent entries, not oldest", () => {
+    const dir = makeTmpDir();
+    const config = resolveConfig({ maxLogEntries: 2 });
+
+    // Seed with a pre-existing log via direct file write
+    const initial = `# State
+
+## Current
+focus: Verify ordering
+
+## Decisions
+
+## Log
+- [2026-01-01] Old entry A
+- [2026-01-02] Old entry B
+- [2026-01-03] Old entry C
+`;
+    fs.writeFileSync(path.join(dir, "STATE.md"), initial, "utf-8");
+    invalidateStateCache();
+
+    // Append one more — total would be 4, trimmed to 2
+    appendToSection(dir, config, "log", "- [2026-01-04] New entry D");
+
+    const content = readStateFile(dir);
+    // Only the 2 most recent should survive
+    expect(content).not.toContain("Old entry A");
+    expect(content).not.toContain("Old entry B");
+    expect(content).toContain("- [2026-01-03] Old entry C");
+    expect(content).toContain("- [2026-01-04] New entry D");
+  });
+
+  test("custom maxLogEntries config is respected", () => {
+    const dir = makeTmpDir();
+    const config = resolveConfig({ maxLogEntries: 5 });
+
+    writeCurrentSection(dir, config, { focus: "Custom limit test" });
+    invalidateStateCache();
+
+    // Add exactly 7 entries
+    for (let i = 1; i <= 7; i++) {
+      appendToSection(dir, config, "log", `- Log ${i}`);
+      invalidateStateCache();
+    }
+
+    const content = readStateFile(dir);
+    // First two should be trimmed, last five should remain
+    expect(content).not.toContain("- Log 1");
+    expect(content).not.toContain("- Log 2");
+    expect(content).toContain("- Log 3");
+    expect(content).toContain("- Log 4");
+    expect(content).toContain("- Log 5");
+    expect(content).toContain("- Log 6");
+    expect(content).toContain("- Log 7");
+  });
+
+  test("Decisions section is never trimmed regardless of count", () => {
+    const dir = makeTmpDir();
+    // Set maxLogEntries very low to prove it doesn't affect Decisions
+    const config = resolveConfig({ maxLogEntries: 2 });
+
+    writeCurrentSection(dir, config, { focus: "Decisions are sacred" });
+    invalidateStateCache();
+
+    // Add 5 decisions — all should survive
+    for (let i = 1; i <= 5; i++) {
+      appendToSection(dir, config, "decisions", `- Decision ${i} [2026-04-${10 + i}]`);
+      invalidateStateCache();
+    }
+
+    const content = readStateFile(dir);
+    for (let i = 1; i <= 5; i++) {
+      expect(content).toContain(`- Decision ${i} [2026-04-${10 + i}]`);
+    }
+  });
+
+  test("no trimming when log is at or below maxLogEntries", () => {
+    const dir = makeTmpDir();
+    const config = resolveConfig({ maxLogEntries: 5 });
+
+    writeCurrentSection(dir, config, { focus: "Under limit test" });
+    invalidateStateCache();
+
+    // Add exactly 5 entries (at the limit, not over)
+    for (let i = 1; i <= 5; i++) {
+      appendToSection(dir, config, "log", `- Entry ${i}`);
+      invalidateStateCache();
+    }
+
+    const content = readStateFile(dir);
+    // All 5 should be present — no trimming
+    for (let i = 1; i <= 5; i++) {
+      expect(content).toContain(`- Entry ${i}`);
+    }
+  });
+
+  test("default maxLogEntries is 30", () => {
+    const config = resolveConfig();
+    expect(config.maxLogEntries).toBe(30);
+  });
+});

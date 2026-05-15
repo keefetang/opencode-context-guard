@@ -42,6 +42,7 @@ export interface PluginConfig {
   agentsMdFileName: string; // default: "AGENTS.md"
   gitCacheTtlMs: number; // default: 30_000
   artifactCacheTtlMs: number; // default: 30_000
+  maxLogEntries: number; // default: 30 — trim Log section to this many entries on write
 }
 
 // ---------------------------------------------------------------------------
@@ -54,6 +55,7 @@ const DEFAULT_CONFIG: PluginConfig = {
   agentsMdFileName: "AGENTS.md",
   gitCacheTtlMs: 30_000,
   artifactCacheTtlMs: 30_000,
+  maxLogEntries: 30,
 };
 
 // ---------------------------------------------------------------------------
@@ -243,6 +245,10 @@ export function appendToSection(
     decisions.push(entry);
   } else {
     log.push(entry);
+    // Trim log to keep only the most recent entries (Decisions are never trimmed)
+    if (log.length > config.maxLogEntries) {
+      log.splice(0, log.length - config.maxLogEntries);
+    }
   }
 
   const content = buildStateContent(current, decisions, log);

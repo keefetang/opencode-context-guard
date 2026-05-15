@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
+## [0.2.1] - 2026-05-16
+
+### Added
+- **Log rotation** — STATE.md Log section now trims to `maxLogEntries` (default: 30) on each append, keeping the most recent entries and discarding oldest. Prevents unbounded growth over weeks of use. Decisions section is never trimmed.
+
 ## [0.2.0] - 2026-05-15
 
 ### Added

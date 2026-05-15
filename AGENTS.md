@@ -69,7 +69,7 @@ handoff: Execute should read all 3 artifacts. Start with step 1.
 |---------|------------|------------|-----------------|
 | **Current** | Overwritten on each checkpoint | Model via `context_checkpoint` | Injected verbatim into system prompt every turn |
 | **Decisions** | Append-only | Model via `context_discover --target decisions` | Plugin never modifies. Injects count into system prompt. |
-| **Log** | Append-only | Model (via `context_discover`) + plugin auto-entries | Auto-appended: session end, commits detected, compaction. NOT injected into system prompt. |
+| **Log** | Append-only (oldest entries trimmed when exceeding maxLogEntries) | Model (via `context_discover`) + plugin auto-entries | Auto-appended: session end, commits detected, compaction. NOT injected into system prompt. |
 
 ### Current section fields
 
