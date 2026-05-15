@@ -10,15 +10,15 @@
 
 import { execSync } from "node:child_process";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 
-import { tool, type Hooks, type PluginInput, type ToolContext, type ToolDefinition } from "@opencode-ai/plugin";
+import { tool, type Hooks, type ToolContext, type ToolDefinition } from "@opencode-ai/plugin";
 
 import {
   appendToSection,
   invalidateStateCache,
   readState,
+  resolveTilde,
   scanArtifacts,
   writeCurrentSection,
 } from "./state-reader.js";
@@ -109,16 +109,32 @@ export function formatRelativeTime(date: Date | number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Path resolution
+// Path containment
 // ---------------------------------------------------------------------------
 
-/** Resolve `~/` prefix to the user's home directory. */
-function resolveTilde(filePath: string): string {
-  if (filePath === "~" || filePath.startsWith("~/")) {
-    return path.join(os.homedir(), filePath.slice(1));
-  }
-  return filePath;
+/**
+ * Check if a resolved absolute path is contained within a root directory.
+ * Both paths should be resolved via `path.resolve()` before calling
+ * (absolute, normalized, no trailing separators).
+ *
+ * Returns true if `resolvedPath` is the root itself or a descendant of it.
+ * Uses `path.sep` suffix check to prevent false positives from prefix overlap
+ * (e.g., `/foo/bar-baz` is NOT contained in `/foo/bar`).
+ */
+export function isPathContained(resolvedPath: string, root: string): boolean {
+  if (root === path.sep) return resolvedPath.startsWith(path.sep);
+  return resolvedPath === root || resolvedPath.startsWith(root + path.sep);
 }
+
+// ---------------------------------------------------------------------------
+// Security constants — field and content length caps
+// ---------------------------------------------------------------------------
+
+/** Max characters for any single field in `context_checkpoint`. */
+export const MAX_FIELD_LEN = 1000;
+
+/** Max characters for the content body of `context_discover`. */
+export const MAX_CONTENT_LEN = 2000;
 
 // ---------------------------------------------------------------------------
 // File size formatting
@@ -196,22 +212,23 @@ function fetchGitStatus(repoRoot: string): GitStatus | null {
     // Uncommitted count: non-empty lines after the first
     const uncommitted = lines.slice(1).filter((l) => l.trim() !== "").length;
 
-    // Last commit — hash for change detection, message+time for display
+    // Last commit — hash for change detection, message+time for display.
+    // Single git call: "%h %s (%cr)" → "abc1234 fix bug (2 hours ago)".
+    // Split on first space to separate hash from display string.
     let lastCommitHash = "";
     let lastCommit = "";
     try {
-      lastCommitHash = execSync("git log -1 --format=%h", {
+      const logOutput = execSync('git log -1 --format="%h %s (%cr)"', {
         cwd: repoRoot,
         encoding: "utf-8",
         timeout: 5_000,
         stdio: ["pipe", "pipe", "pipe"],
       }).trim();
-      lastCommit = execSync('git log -1 --format="%s (%cr)"', {
-        cwd: repoRoot,
-        encoding: "utf-8",
-        timeout: 5_000,
-        stdio: ["pipe", "pipe", "pipe"],
-      }).trim();
+      const spaceIdx = logOutput.indexOf(" ");
+      if (spaceIdx !== -1) {
+        lastCommitHash = logOutput.slice(0, spaceIdx);
+        lastCommit = logOutput.slice(spaceIdx + 1);
+      }
     } catch {
       // No commits yet or other error — leave empty
     }
@@ -230,12 +247,10 @@ function fetchGitStatus(repoRoot: string): GitStatus | null {
 /**
  * Create the context guard hook handlers.
  *
- * @param ctx - Plugin context from the `init` callback.
  * @param repoRoot - Absolute path to the repository root.
  * @param config - Resolved plugin configuration.
  */
 export function createContextGuard(
-  _ctx: PluginInput,
   repoRoot: string,
   config: PluginConfig,
 ): ContextGuardResult {
@@ -666,6 +681,16 @@ export function createContextGuard(
         .describe("Who should continue and where to start"),
     },
     async execute(args, context: ToolContext): Promise<string> {
+      // Security: cap field lengths to prevent system prompt token exhaustion.
+      // These fields are injected into the system prompt every turn.
+      const fields = ["focus", "phase", "task", "blockers", "next", "handoff"] as const;
+      for (const field of fields) {
+        const value = args[field];
+        if (value !== undefined && value.length > MAX_FIELD_LEN) {
+          return `Refused: ${field} exceeds ${MAX_FIELD_LEN} character limit (got ${value.length})`;
+        }
+      }
+
       const current: CurrentSection = { focus: args.focus };
       if (args.phase !== undefined) current.phase = args.phase;
       if (args.task !== undefined) current.task = args.task;
@@ -711,6 +736,14 @@ export function createContextGuard(
       // Resolve ~/ once — scanArtifacts resolves internally, but we need
       // the resolved path to read file contents.
       const resolved = resolveTilde(args.task_folder);
+
+      // Security: restrict reads to within repoRoot or plansDir.
+      // Prevents model-driven reads of arbitrary filesystem locations.
+      const resolvedPlansDir = resolveTilde(config.plansDir);
+      if (!isPathContained(resolved, repoRoot) && !isPathContained(resolved, resolvedPlansDir)) {
+        return `Refused: task folder must be within ${repoRoot} or ${config.plansDir}`;
+      }
+
       const artifacts = scanArtifacts(args.task_folder, config);
 
       if (artifacts.length === 0) {
@@ -758,17 +791,23 @@ export function createContextGuard(
   });
 
   const contextDiscover = tool({
-    description: "Append a finding, decision, or note to STATE.md or a file.",
+    description:
+      "Append a finding, decision, or note to STATE.md.",
     args: {
       content: z.string().describe("What to save"),
       target: z
         .string()
         .optional()
         .describe(
-          'Where to save: "log" (default), "decisions", or a file path',
+          'Where to save: "log" (default) or "decisions"',
         ),
     },
     async execute(args, context: ToolContext): Promise<string> {
+      // Security: cap content length to prevent STATE.md/log bloat
+      if (args.content.length > MAX_CONTENT_LEN) {
+        return `Refused: content exceeds ${MAX_CONTENT_LEN} character limit (got ${args.content.length})`;
+      }
+
       const target = args.target ?? "log";
 
       if (target === "log") {
@@ -805,15 +844,7 @@ export function createContextGuard(
         return `Saved to STATE.md Decisions: ${args.content}`;
       }
 
-      // Arbitrary file path
-      try {
-        const timestamp = formatTimestamp();
-        fs.appendFileSync(target, `\n${timestamp} ${args.content}\n`, "utf-8");
-        return `Appended to ${target}`;
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return `Failed to append to ${target}: ${msg}`;
-      }
+      return `Unknown target "${target}". Use "log" or "decisions", or use the edit/write tools for other files.`;
     },
   });
 

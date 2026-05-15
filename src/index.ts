@@ -21,7 +21,7 @@ export const ContextGuardPlugin: Plugin = async (ctx, options) => {
   // Diagnostic: log on init so --print-logs confirms plugin is loading
   void ctx.client.app.log({ body: { service: "context-guard", level: "info", message: `context-guard loaded (repoRoot: ${repoRoot})` } });
 
-  const guard = createContextGuard(ctx, repoRoot, config);
+  const guard = createContextGuard(repoRoot, config);
 
   return {
     ...guard.hooks,

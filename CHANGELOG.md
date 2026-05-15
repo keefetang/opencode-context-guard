@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
+## [0.2.2] - 2026-05-16
+
+### Security
+- **Removed arbitrary file write from `context_discover`** — the tool previously accepted any filesystem path as `target`, allowing model-driven writes to sensitive locations (e.g., `~/.bashrc`, `~/.ssh/`). Now only accepts `"log"` or `"decisions"` as targets. Use `edit`/`write` tools for other files.
+- **Path containment for `context_load`** — directory reads restricted to within `repoRoot` or `config.plansDir`. Prevents model-driven reads of arbitrary filesystem locations.
+- **Field length caps** — `context_checkpoint` fields capped at 1000 chars, `context_discover` content capped at 2000 chars. Prevents system prompt token exhaustion from unbounded field values.
+
+### Changed
+- **`resolveTilde` deduplicated** — moved to `state-reader.ts` as a single exported function. `scanArtifacts` and `context_load` now share the same implementation instead of having an inline copy.
+- **Git log merged into single call** — `fetchGitStatus` now runs one `git log -1` instead of two, splitting hash from display string. Saves one process spawn per 30-second cache refresh.
+- **Removed unused `_ctx` parameter** from `createContextGuard` — the `PluginInput` was passed through but never used inside the closure.
+
+### Added
+- Extracted `isPathContained` as an exported helper for path containment validation
+- 31 security-focused unit tests covering path containment, tilde resolution, length cap constants, and integration scenarios
+- AGENTS.md Security section documenting mitigated and accepted security considerations
+
 ## [0.2.1] - 2026-05-16
 
 ### Added

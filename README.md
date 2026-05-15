@@ -28,7 +28,7 @@ State updated: 12 minutes ago
 Decisions: 8 locked, 2 rejected
 Task: 260410-opencode-media-guard — goal.md ✓, anchor.md ✓, plan.md ✓, summary.md ✗
 Git: main, 2 uncommitted, 1 ahead. Last: "add git conventions" (89 min ago)
-Session: 23 min, 14 tool calls, 5 files modified
+Session: 23 min, 14 tool calls, files modified
 Obligations: STATE.md needs checkpoint (files changed since last update)
 ```
 
@@ -117,7 +117,7 @@ handoff: Execute should read all 3 artifacts. Start with step 1.
 
 **Decisions** — Append-only. Locked decisions and rejected approaches. Never rewritten, never lost.
 
-**Log** — Append-only. Milestones from the agent, auto-entries from the plugin. Not injected — available for deep context when needed.
+**Log** — Append-only, capped at 30 entries (oldest trimmed). Milestones from the agent, auto-entries from the plugin. Not injected — available for deep context when needed.
 
 ## Install
 

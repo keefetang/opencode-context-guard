@@ -32,7 +32,7 @@ Entry point: `src/index.ts` exports `ContextGuardPlugin`, a plugin function regi
 |------|---------|
 | `context_checkpoint` | Overwrite the Current section of STATE.md. Preserves Decisions + Log. Appends a checkpoint log entry. Invalidates the STATE.md cache. Clears the checkpoint obligation. |
 | `context_load` | Scan a task folder and return names, sizes, mtimes, and first 10 lines of each `.md` artifact. Pure read — no side effects. |
-| `context_discover` | Append a finding, decision, or note to STATE.md's Log section (default), Decisions section (`target: "decisions"`), or an arbitrary file path. Arbitrary file paths use raw append — no STATE.md structure or cache invalidation. |
+| `context_discover` | Append a finding, decision, or note to STATE.md's Log section (default) or Decisions section (`target: "decisions"`). Only writes to STATE.md — use `edit`/`write` for other files. |
 
 ### Event Handler
 
@@ -92,7 +92,7 @@ handoff: Execute should read all 3 artifacts. Start with step 1.
 - **Pure JS only** — no native dependencies. Runtime dep is `@opencode-ai/plugin` only. Uses Node.js built-ins (`fs`, `path`, `os`, `child_process`) and `execSync` for git.
 - **Source ships as `.ts`** — Bun transpiles natively. No build step.
 - **STATE.md cache is mtime-based**, not TTL. Re-reads when `fs.statSync` shows mtime changed. Git and artifact caches are TTL-based (30s default).
-- **Git cache is 30s TTL.** Commit detection compares `lastCommit` across cache refreshes — if the commit message changes, appends an `[auto]` log entry. Skips the first cache fill to avoid false positives.
+- **Git cache is 30s TTL.** Commit detection compares `lastCommitHash` across cache refreshes — if the hash changes, appends an `[auto]` log entry. Skips the first cache fill to avoid false positives. A `lastLoggedCommitHash` dedup guard prevents repeated logging of the same commit.
 - **External change detection** tracks STATE.md and AGENTS.md mtime between turns. On mtime change (not first turn), pushes a ⚠ warning into the system prompt before the context block.
 - **`[auto]` log entries** are plugin-generated. Never written by the model. Signals to the next session that no explicit checkpoint was made.
 - **Use `context_checkpoint` for STATE.md updates** (not raw Write tool) — it preserves Decisions/Log sections and invalidates the cache. Direct Write would clobber Decisions and Log.
@@ -139,3 +139,18 @@ What to look for:
 - **No `parentSessionID`** — determining primary vs subagent requires a `session.get()` API call. The plugin does not currently distinguish primary from subagent sessions.
 - **Working directory** comes from `PluginInput` at init time (`ctx.directory`), not from hooks directly.
 - **Bash file writes not tracked** — only `edit` and `write` tool calls set `filesModified`. Bash commands that write files via shell are not detected. Accepted tradeoff — covers 95%+ of real file changes.
+
+## Security
+
+### Mitigated
+
+- **Path containment** — `context_load` directory reads are restricted to within `repoRoot` or `config.plansDir`. `context_discover` only writes to STATE.md (arbitrary file path support was removed). Prevents model-driven reads/writes to sensitive filesystem locations.
+- **Field length caps** — `context_checkpoint` fields capped at 1000 chars, `context_discover` content capped at 2000 chars. Prevents system prompt token exhaustion from unbounded field values.
+
+### Accepted (documented tradeoffs)
+
+- **System prompt feedback loop** — STATE.md fields are injected verbatim into the system prompt. The model writes these fields and reads them back. A confused model could write adversarial content that gets re-injected. Mitigated by the structured `## Context Guard` block framing and the single-user threat model.
+- **TOCTOU race in read-modify-write** — `writeCurrentSection` and `appendToSection` read STATE.md, modify in memory, and write back. A concurrent write between read and write would be silently overwritten. The window is microseconds (synchronous fs). Acceptable for single-user use.
+- **`execSync` blocks event loop** — Git operations block for up to 10s worst case (two 5s timeouts). Mitigated by 30s TTL cache — git is fetched at most once per 30 seconds. On reasonable local repos, actual blocking is <100ms.
+- **Non-atomic writes** — `writeFileSync` is not atomic. A process kill during write could corrupt STATE.md. The write completes in microseconds for typical file sizes. Acceptable risk.
+- **Absolute path in system prompt** — `repoRoot` is exposed to the model in the `## Context Guard` block. Acceptable for single-user installations. Would need to be masked in a multi-tenant deployment.

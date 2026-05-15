@@ -1,6 +1,6 @@
 {
   "name": "opencode-context-guard",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "OpenCode plugin that enforces context management — STATE.md injection, planning artifacts, git awareness, and obligation tracking",
   "type": "module",
   "main": "src/index.ts",

@@ -59,6 +59,18 @@ const DEFAULT_CONFIG: PluginConfig = {
 };
 
 // ---------------------------------------------------------------------------
+// Path resolution
+// ---------------------------------------------------------------------------
+
+/** Resolve `~/` prefix to the user's home directory. */
+export function resolveTilde(filePath: string): string {
+  if (filePath === "~" || filePath.startsWith("~/")) {
+    return path.join(os.homedir(), filePath.slice(1));
+  }
+  return filePath;
+}
+
+// ---------------------------------------------------------------------------
 // Config resolution
 // ---------------------------------------------------------------------------
 
@@ -276,10 +288,7 @@ export function scanArtifacts(taskFolder: string, config: PluginConfig): Artifac
     return artifactCache.artifacts;
   }
 
-  // Resolve ~/ in paths (not ~user/ which is a different Unix convention)
-  const resolved = taskFolder === "~" || taskFolder.startsWith("~/")
-    ? path.join(os.homedir(), taskFolder.slice(1))
-    : taskFolder;
+  const resolved = resolveTilde(taskFolder);
 
   try {
     const entries = fs.readdirSync(resolved, { withFileTypes: true });
