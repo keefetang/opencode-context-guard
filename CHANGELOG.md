@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
+## [0.2.0] - 2026-05-15
+
+### Added
+- **Automated unit tests** — 44 tests (132 assertions) covering `parseStateFile`, `writeCurrentSection`, `appendToSection`, `formatRelativeTime`, and `extractCommitMessage` pattern. Uses Bun's built-in test runner.
+- **Commit detection dedup guard** — `lastLoggedCommitHash` variable prevents duplicate `[auto] Committed:` log entries across cache resets and process restarts
+
+### Changed
+- Updated `@opencode-ai/plugin` from ^1.4.3 to ^1.15.0
+- AGENTS.md line counts changed to approximate ranges (~30, ~860, ~300) to avoid constant maintenance
+- AGENTS.md corrected: git cache is closure-scoped (not module-scoped as previously documented)
+
+### Fixed
+- MIGRATION.md referenced stale plugin name `opencode-notify` → `opencode-alert`
+- STATE.md log cleaned up — removed 100+ duplicate `[auto] Committed:` entries caused by pre-v0.1.2 `%cr` relative time bug running on an unrestarted process
+- TODO.md updated to reflect confirmed-working features and remaining work
+
 ## [0.1.3] - 2026-04-12
 
 ### Fixed

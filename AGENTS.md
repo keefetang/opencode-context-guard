@@ -14,9 +14,9 @@ Entry point: `src/index.ts` exports `ContextGuardPlugin`, a plugin function regi
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `src/index.ts` | 33 | Plugin entry point — resolves config, warms STATE.md cache, wires hooks/tools/events |
-| `src/context-guard.ts` | 842 | Hooks, tools, git integration, session tracking, obligation detection, system prompt builder |
-| `src/state-reader.ts` | 303 | STATE.md parse/cache/read/write, artifact scanning, config types and defaults |
+| `src/index.ts` | ~30 | Plugin entry point — resolves config, warms STATE.md cache, wires hooks/tools/events |
+| `src/context-guard.ts` | ~860 | Hooks, tools, git integration, session tracking, obligation detection, system prompt builder |
+| `src/state-reader.ts` | ~300 | STATE.md parse/cache/read/write, artifact scanning, config types and defaults |
 
 ## Plugin Hooks
 
@@ -96,7 +96,8 @@ handoff: Execute should read all 3 artifacts. Start with step 1.
 - **External change detection** tracks STATE.md and AGENTS.md mtime between turns. On mtime change (not first turn), pushes a ⚠ warning into the system prompt before the context block.
 - **`[auto]` log entries** are plugin-generated. Never written by the model. Signals to the next session that no explicit checkpoint was made.
 - **Use `context_checkpoint` for STATE.md updates** (not raw Write tool) — it preserves Decisions/Log sections and invalidates the cache. Direct Write would clobber Decisions and Log.
-- **Per-session state** is tracked in a `Map<string, SessionState>`. Session-level: tool count, files modified, first-turn flag, start time, last-seen mtimes. Project-level caches (STATE.md, git, artifacts) are module-scoped and shared across sessions.
+- **Per-session state** is tracked in a `Map<string, SessionState>`. Session-level: tool count, files modified, first-turn flag, start time, last-seen mtimes. Git cache is closure-scoped inside `createContextGuard` (shared across sessions within one plugin instance). STATE.md and artifact caches are module-scoped in `state-reader.ts`.
+- **Commit detection dedup** — a `lastLoggedCommitHash` variable in the closure prevents duplicate `[auto] Committed:` entries even if the git cache resets (process restart, multiple processes).
 - **Session sweep** at Map > 50 entries: removes entries inactive for 5+ minutes. Primary cleanup is `session.idle`.
 
 ## Testing

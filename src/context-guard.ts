@@ -305,8 +305,15 @@ export function createContextGuard(
   // Git cache — shared across sessions (git status is repo state)
   // -----------------------------------------------------------------------
   let gitCache: GitCache | null = null;
+  /** Last commit hash we logged — dedup guard against repeated detection of the same commit.
+   *  Prevents duplicate `[auto] Committed:` entries when:
+   *  - Multiple OpenCode processes share the same repo (each has its own in-memory cache)
+   *  - The plugin restarts (gitCache resets to null, first-fill guard helps but this is belt-and-suspenders) */
+  let lastLoggedCommitHash = "";
 
-  /** Strip trailing ` (relative time)` from git log format `"%s (%cr)"`. */
+  /** Strip trailing ` (relative time)` from git log format `"%s (%cr)"`.
+   *  Note: this regex is duplicated in test/context-guard.test.ts since the
+   *  function is closure-scoped. Update both if changing the pattern. */
   function extractCommitMessage(logLine: string): string {
     const match = /^(.+)\s+\([^)]+\)$/.exec(logLine);
     return match?.[1] ?? logLine;
@@ -326,11 +333,14 @@ export function createContextGuard(
       // Detect new commits — compare short hashes for reliable change detection.
       // Hashes are stable (unlike commit messages which could be identical across commits).
       // Skip the first cache fill (previousHash === "") to avoid false positives.
+      // Dedup guard: also skip if we already logged this specific commit hash.
       if (
         previousHash !== "" &&
         status.lastCommitHash !== "" &&
-        status.lastCommitHash !== previousHash
+        status.lastCommitHash !== previousHash &&
+        status.lastCommitHash !== lastLoggedCommitHash
       ) {
+        lastLoggedCommitHash = status.lastCommitHash;
         const message = extractCommitMessage(status.lastCommit);
         appendToSection(
           repoRoot,
