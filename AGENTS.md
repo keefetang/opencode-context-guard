@@ -154,3 +154,5 @@ What to look for:
 - **`execSync` blocks event loop** — Git operations block for up to 10s worst case (two 5s timeouts). Mitigated by 30s TTL cache — git is fetched at most once per 30 seconds. On reasonable local repos, actual blocking is <100ms.
 - **Non-atomic writes** — `writeFileSync` is not atomic. A process kill during write could corrupt STATE.md. The write completes in microseconds for typical file sizes. Acceptable risk.
 - **Absolute path in system prompt** — `repoRoot` is exposed to the model in the `## Context Guard` block. Acceptable for single-user installations. Would need to be masked in a multi-tenant deployment.
+
+See `~/.config/opencode/context/opencode-plugins.md` for SDK reference and cross-plugin conventions.

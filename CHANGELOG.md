@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
+## [0.3.1] — 2026-05-16
+
+### Changed
+- Updated devDeps: bun-types ^1.3.14, typescript ^6.0.3
+- CI and publish workflows now run `bun test`
+- Standardized .gitignore, switched lockfile from package-lock.json to bun.lock
+- AGENTS.md references shared plugin SDK doc
+
 ## [0.3.0] - 2026-05-16
 
 ### Changed
