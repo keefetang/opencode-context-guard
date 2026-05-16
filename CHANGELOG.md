@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
+## [0.3.0] - 2026-05-16
+
+### Changed
+- Updated `softprops/action-gh-release` from v2 to v3 (Node 24 runtime)
+- Updated `typescript` from 6.0.2 to 6.0.3 (patch bug fixes)
+- Updated `bun-types` from 1.3.12 to 1.3.13 (matches local Bun runtime)
+- Removed dead `os` import from `context-guard.ts` (moved to `state-reader.ts` with `resolveTilde`)
+
+### Fixed
+- README: session line example showed "5 files modified" but code outputs a boolean, not a count
+- README: Log section described as "Append-only" — now notes the 30-entry cap from v0.2.1
+- AGENTS.md: Security section said "three 5s timeouts" (15s) — corrected to two (10s) after git log merge
+
 ## [0.2.2] - 2026-05-16
 
 ### Security
